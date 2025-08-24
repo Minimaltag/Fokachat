@@ -308,7 +308,7 @@
       DB.user = store.get('anon:user') || newRandomUser();
       DB.user.lastActive = Date.now();
       DB.users = store.get('anon:users', []);
-      if (!DB.users.find(u => u.id === DB.user.id)) DB.users.push(DB.user);
+      if (!DB.users.find(u => u.id === DB.user.id)) DB.users.push(DB.user);            
       DB.messages = store.get('anon:messages', seedMessages());
       DB.likes = store.get('anon:likes', {});
       persist();
@@ -316,7 +316,7 @@
 
     function persist() {
       store.set('anon:user', DB.user);
-      store.set('anon:users', DB.users);
+      store.set('anon:users', DB.users);      
       store.set('anon:messages', DB.messages);
       store.set('anon:likes', DB.likes);
       renderHeader();
@@ -443,16 +443,16 @@
       },
       perfis() {
         const container = document.createElement('div');
-        container.innerHTML = `<h3 style="margin-top:0">Perfis ativos (últimas 24 horas)</h3>`;
+        container.innerHTML = `<h3 style="margin-top:0">Perfis ativos (últimos 60 minutos)</h3>`;
         const grid = document.createElement('div');
         grid.className = 'profiles';
-        const threeDays = 1 * 24 * 60 * 60 * 1000;
-        const activeUsers = DB.users.filter(u => (Date.now() - (u.lastActive || u.createdAt)) <= threeDays);
+        const tenMinutes = 60 * 60 * 1000; // 60 minutos em milissegundos
+        const activeUsers = DB.users.filter(u => (Date.now() - (u.lastActive || u.createdAt)) <= tenMinutes);
         activeUsers.sort((a, b) => (b.lastActive || b.createdAt) - (a.lastActive || a.createdAt)).forEach(u => {
           grid.appendChild(renderProfileCard(u));
         });
         if (activeUsers.length === 0) {
-          grid.innerHTML = `<div class="empty">Nenhum perfil ativo nos últimos 3 dias.</div>`;
+          grid.innerHTML = `<div class="empty">Nenhum perfil ativo nos últimos 60 minutos.</div>`;
         }
         container.appendChild(grid);
         return container;
@@ -677,7 +677,14 @@
       if (DB.connected) {
         try {
           const userDocRef = doc(dbFire, 'users', DB.user.id);
-          await setDoc(userDocRef, { lastActive: Timestamp.fromMillis(DB.user.lastActive) }, { merge: true });
+          await setDoc(userDocRef, {
+            id: DB.user.id,
+            name: DB.user.name,
+            emoji: DB.user.emoji,
+            bg: DB.user.bg,
+            createdAt: Timestamp.fromMillis(DB.user.createdAt),
+            lastActive: Timestamp.fromMillis(DB.user.lastActive)
+          }, { merge: true });
         } catch (e) {
           console.warn('Não foi possível atualizar lastActive na nuvem', e);
         }
