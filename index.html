@@ -36,22 +36,38 @@
       .wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
       .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
       .brand { font-weight: 800; letter-spacing: .3px; }
-      .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+      .tabs {
+        position: fixed;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 30;
+        background: rgba(255, 255, 255, .95);
+        backdrop-filter: blur(8px);
+        border-radius: 999px;
+        padding: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        display: flex;
+        gap: 8px;
+        flex-wrap: nowrap;
+      }
       .tab {
-        padding: 8px 12px;
+        padding: 8px 16px;
         border-radius: 999px;
         border: 1px solid var(--secondary);
         cursor: pointer;
         transition: .18s;
         background: transparent;
         color: var(--text);
+        font-size: 14px;
+        white-space: nowrap;
       }
       .tab.active, .tab:hover {
         background: var(--secondary);
         color: #fff;
         border-color: transparent;
       }
-      main { padding: 20px; }
+      main { padding: 20px; padding-bottom: 80px; } /* Adicionado padding-bottom para evitar sobreposição com tabs */
       .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
       @media (min-width: 880px) { .grid { grid-template-columns: 1.2fr .8fr; } }
       .card {
@@ -181,506 +197,677 @@
         user-select: all;
       }
       .muted-note { font-size: 13px; color: var(--muted); margin-top: 8px; }
+      .ranking-text {
+        font-size: 14px;
+        line-height: 1.5;
+        word-break: break-word;
+        white-space: pre-wrap;
+        max-width: 100%;
+        overflow-wrap: break-word;
+      }
     </style>
-  </head>
-  <body>
-    <header>
-      <div class="wrap row">
-        <div class="row" style="gap:10px;flex:1">
-          <span class="chip">☁️</span>
-          <div>
-            <div class="brand">Comunicado Anônimo</div>
-            <div class="muted" id="meLine">Conectando…</div>
-          </div>
+</head>
+<body>
+  <header>
+    <div class="wrap row">
+      <div class="row" style="gap:10px;flex:1">
+        <div id="headerAvatar"></div>
+        <div>
+          <div class="muted" id="meLine">Conectando…</div>
         </div>
-        <nav class="tabs">
-          <button class="tab active" data-tab="feed">Feed</button>
-          <button class="tab" data-tab="ranking">Ranking</button>
-          <button class="tab" data-tab="postar">Postar</button>
-          <button class="tab" data-tab="perfis">Perfis</button>
-        </nav>
       </div>
-    </header>
-    <main class="wrap">
-      <div class="grid">
-        <section class="card pad" id="view">
-          <!-- Views render here -->
-        </section>
-        <aside class="card pad">
-          <h3 style="margin:0 0 8px">Meu Perfil</h3>
-          <div id="myProfile"></div>
-          <div class="sep"></div>
-          <div>
-            <h4 style="margin:0 0 8px">Sincronizar entre navegadores</h4>
-            <div class="muted" style="font-size:13px">
-              Gere um <b>código de transferência</b> e cole-o em outro navegador para usar o mesmo ID anônimo.
-            </div>
-            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn primary" id="genCodeBtn">Gerar código de transferência</button>
-              <button class="btn" id="importCodeBtn">Importar código</button>
-              <button class="btn" id="reseedBtn">Gerar novo perfil (aleatório)</button>
-            </div>
-            <div class="muted-note">Aviso: quem tiver o código poderá assumir este perfil anônimo. Compartilhe com responsabilidade.</div>
+    </div>
+  </header>
+  <main class="wrap">
+    <div class="grid">
+      <section class="card pad" id="view">
+        <!-- Views render here -->
+      </section>
+      <aside class="card pad">
+        <h3 style="margin:0 0 8px">Meu Perfil</h3>
+        <div id="myProfile"></div>
+        <div class="sep"></div>
+        <div>
+          <h4 style="margin:0 0 8px">Sincronizar entre navegadores</h4>
+          <div class="muted" style="font-size:13px">
+            Gere um <b>código de transferência</b> e cole-o em outro navegador para usar o mesmo ID anônimo.
           </div>
-          <div class="sep"></div>
-          <div class="foot">Cadastro é anônimo. Avatar e nome aleatórios. Dados ficam localmente e — quando conectado — sincronizados com Firestore.</div>
-        </aside>
-      </div>
-    </main>
-    <div id="modalRoot" style="display:none"></div>
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-      import {
-        getFirestore, collection, doc, setDoc, getDoc, onSnapshot,
-        addDoc, query, orderBy, where, limit, arrayUnion, arrayRemove,
-        deleteDoc, getDocs, Timestamp, updateDoc
-      } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
-      import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn primary" id="genCodeBtn">Gerar código de transferência</button>
+            <button class="btn" id="importCodeBtn">Importar código</button>
+            <button class="btn" id="reseedBtn">Gerar novo perfil (aleatório)</button>
+          </div>
+          <div class="muted-note">Aviso: quem tiver o código poderá assumir este perfil anônimo. Compartilhe com responsabilidade.</div>
+        </div>
+        <div class="sep"></div>
+        <div class="foot">Cadastro é anônimo. Avatar e nome aleatórios. Dados ficam localmente e — quando conectado — sincronizados com Firestore.</div>
+      </aside>
+    </div>
+  </main>
+  <nav class="tabs">
+    <button class="tab active" data-tab="feed">Feed</button>
+    <button class="tab" data-tab="ranking">Ranking</button>
+    <button class="tab" data-tab="postar">Postar</button>
+    <button class="tab" data-tab="perfis">Perfis</button>
+  </nav>
+  <div id="modalRoot" style="display:none"></div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import {
+      getFirestore, collection, doc, setDoc, getDoc, onSnapshot,
+      addDoc, query, orderBy, where, limit, arrayUnion, arrayRemove,
+      deleteDoc, getDocs, Timestamp, updateDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
-      const $ = (s, root = document) => root.querySelector(s);
-      const $$ = (s, root = document) => Array.from(root.querySelectorAll(s));
-      const store = {
-        get(k, def) { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } },
-        set(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
-      };
+    const $ = (s, root = document) => root.querySelector(s);
+    const $$ = (s, root = document) => Array.from(root.querySelectorAll(s));
+    const store = {
+      get(k, def) { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } },
+      set(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+    };
 
-      const COLORS = ["#e6edf3", "#dbe2ea", "#eef2f6", "#f4f7fb", "#e9eef6"];
-      const EMOJIS = ["🦊", "🦉", "🦄", "🐼", "🐧", "🦋", "🐙", "🐳", "🐱", "🐯", "🐸", "🦕", "🛰️", "🌌", "💫", "🎧", "🎲", "🎯", "📡"];
-      const ADJ = ["Ágil", "Sutil", "Cósmic", "Bravo", "Zen", "Nômade", "Veloz", "Lunar", "Solar", "Risonho", "Críptico", "Brilhante", "Nebuloso", "Furtivo"];
-      const NOUN = ["Jaguar", "Orion", "Quasar", "Vagalume", "Cometa", "Cacto", "Viking", "Cobra", "Lince", "Lagarto", "Panda", "Falcon", "Guaxinim"];
-      const rnd = (arr) => arr[Math.floor(Math.random() * arr.length)];
-      const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+    const COLORS = ["#e6edf3", "#dbe2ea", "#eef2f6", "#f4f7fb", "#e9eef6"];
+    const EMOJIS = ["🦊", "🦉", "🦄", "🐼", "🐧", "🦋", "🐙", "🐳", "🐱", "🐯", "🐸", "🦕", "🛰️", "🌌", "💫", "🎧", "🎲", "🎯", "📡"];
+    const ADJ = ["Ágil", "Sutil", "Cósmic", "Bravo", "Zen", "Nômade", "Veloz", "Lunar", "Solar", "Risonho", "Críptico", "Brilhante", "Nebuloso", "Furtivo"];
+    const NOUN = ["Jaguar", "Orion", "Quasar", "Vagalume", "Cometa", "Cacto", "Viking", "Cobra", "Lince", "Lagarto", "Panda", "Falcon", "Guaxinim"];
+    const rnd = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
-      function newRandomUser() {
-        const name = `${rnd(ADJ)} ${rnd(NOUN)}-${Math.floor(Math.random() * 90 + 10)}`;
-        const bg = rnd(COLORS);
-        const emoji = rnd(EMOJIS);
-        return { id: uid(), name, emoji, bg, createdAt: Date.now(), lastActive: Date.now() };
-      }
+    function newRandomUser() {
+      const name = `${rnd(ADJ)} ${rnd(NOUN)}-${Math.floor(Math.random() * 90 + 10)}`;
+      const bg = rnd(COLORS);
+      const emoji = rnd(EMOJIS);
+      return { id: uid(), name, emoji, bg, createdAt: Date.now(), lastActive: Date.now(), lastReseed: 0 };
+    }
 
-      const DB = {
-        user: null,
-        users: [],
-        messages: [],
-        likes: {},
-        connected: false,
-        firestoreListenerUnsub: null,
-        usersUnsub: null
-      };
+    const DB = {
+      user: null,
+      users: [],
+      messages: [],
+      likes: {},
+      connected: false,
+      firestoreListenerUnsub: null,
+      usersUnsub: null
+    };
 
-      const firebaseConfig = {
-        apiKey: "AIzaSyDd-i47C51sseWaMtZbBBdPbObjP1_kYzU",
-        authDomain: "minimaltag-28769.firebaseapp.com",
-        projectId: "minimaltag-28769",
-        storageBucket: "minimaltag-28769.firebasestorage.app",
-        messagingSenderId: "645337589970",
-        appId: "1:645337589970:web:24be0fabbc3f2b30eaa50b"
-      };
+    const firebaseConfig = {
+      apiKey: "AIzaSyDd-i47C51sseWaMtZbBBdPbObjP1_kYzU",
+      authDomain: "minimaltag-28769.firebaseapp.com",
+      projectId: "minimaltag-28769",
+      storageBucket: "minimaltag-28769.firebasestorage.app",
+      messagingSenderId: "645337589970",
+      appId: "1:645337589970:web:24be0fabbc3f2b30eaa50b"
+    };
 
-      const app = initializeApp(firebaseConfig);
-      const dbFire = getFirestore(app);
-      const auth = getAuth();
+    const app = initializeApp(firebaseConfig);
+    const dbFire = getFirestore(app);
+    const auth = getAuth();
 
-      function hydrate() {
-        DB.user = store.get('anon:user') || newRandomUser();
-        DB.user.lastActive = Date.now();
-        DB.users = store.get('anon:users', []);
-        if (!DB.users.find(u => u.id === DB.user.id)) DB.users.push(DB.user);
-        DB.messages = store.get('anon:messages', seedMessages());
-        DB.likes = store.get('anon:likes', {});
-        persist();
-      }
+    function hydrate() {
+      DB.user = store.get('anon:user') || newRandomUser();
+      DB.user.lastActive = Date.now();
+      DB.users = store.get('anon:users', []);
+      if (!DB.users.find(u => u.id === DB.user.id)) DB.users.push(DB.user);
+      DB.messages = store.get('anon:messages', seedMessages());
+      DB.likes = store.get('anon:likes', {});
+      persist();
+    }
 
-      function persist() {
-        store.set('anon:user', DB.user);
-        store.set('anon:users', DB.users);
-        store.set('anon:messages', DB.messages);
-        store.set('anon:likes', DB.likes);
-        renderHeader();
-        renderMyProfile();
-      }
+    function persist() {
+      store.set('anon:user', DB.user);
+      store.set('anon:users', DB.users);
+      store.set('anon:messages', DB.messages);
+      store.set('anon:likes', DB.likes);
+      renderHeader();
+      renderMyProfile();
+    }
 
-      function seedMessages() {
-        if (DB.messages.length > 0) return DB.messages;
-        const samples = [
-          { userId: DB.user.id, text: "Bem-vindos ao mural anônimo!", createdAt: Date.now() - 3600_000 },
-          { userId: DB.user.id, text: "Qual seu app favorito hoje?", createdAt: Date.now() - 1800_000 },
-          { userId: DB.user.id, text: "Deixe aqui sua mensagem 👇", createdAt: Date.now() - 600_000 }
-        ];
-        return samples.map(m => ({ id: uid(), ...m }));
-      }
+    function seedMessages() {
+      if (DB.messages.length > 0) return DB.messages;
+      const samples = [
+        { userId: DB.user.id, text: "Bem-vindos ao mural anônimo!", createdAt: Date.now() - 3600_000 },
+        { userId: DB.user.id, text: "Qual seu app favorito hoje?", createdAt: Date.now() - 1800_000 },
+        { userId: DB.user.id, text: "Deixe aqui sua mensagem 👇", createdAt: Date.now() - 600_000 }
+      ];
+      return samples.map(m => ({ id: uid(), ...m }));
+    }
 
-      const Views = {
-        feed() {
-          const container = document.createElement('div');
-          container.innerHTML = `<div class="row" style="justify-content:space-between;gap:8px;margin-bottom:8px">
-              <h3 style="margin:0">Feed público</h3>
-              <div class="chip">${DB.connected ? 'Sincronizado ☁️' : 'Offline (local)'}</div>
-            </div>`;
-          const list = document.createElement('div');
-          list.className = 'list';
-          DB.messages.slice().sort((a, b) => b.createdAt - a.createdAt).forEach(msg => {
-            list.appendChild(renderMessage(msg));
-          });
-          if (DB.messages.length === 0) {
-            list.innerHTML = `<div class="empty">Sem mensagens ainda. Vá em <b>Postar</b> e mande a primeira!</div>`;
-          }
-          container.appendChild(list);
-          return container;
-        },
-        ranking() {
-          const container = document.createElement('div');
-          container.innerHTML = `<div class="row" style="justify-content:space-between;gap:8px;margin-bottom:8px">
-              <h3 style="margin:0">Ranking • Mais curtidas</h3>
-              <div class="chip">Top 20 por ❤</div>
-            </div>`;
-          const list = document.createElement('div');
-          list.className = 'list';
-          DB.messages.slice().sort((a, b) => {
-            const la = countLikes(a.id), lb = countLikes(b.id);
-            if (lb !== la) return lb - la;
-            return b.createdAt - a.createdAt;
-          }).slice(0, 20).forEach(msg => list.appendChild(renderMessage(msg)));
-          if (DB.messages.length === 0) {
-            list.innerHTML = `<div class="empty">Nada por aqui ainda… Poste algo e ganhe curtidas!</div>`;
-          }
-          container.appendChild(list);
-          return container;
-        },
-        postar() {
-          const container = document.createElement('div');
-          container.innerHTML = `<h3 style="margin-top:0">Postar mensagem</h3>`;
-          const area = document.createElement('textarea');
-          area.placeholder = "Escreva algo gentil, curioso ou divertido…";
-          const row = document.createElement('div');
-          row.className = 'row';
-          row.style.marginTop = '8px';
-          const btn = document.createElement('button');
-          btn.className = 'btn primary';
-          btn.textContent = 'Publicar';
-          btn.onclick = async () => {
-            const text = area.value.trim();
-            if (text.length === 0) { area.focus(); return; }
-            DB.user.lastActive = Date.now();
-            const msg = { id: uid(), userId: DB.user.id, text, createdAt: Date.now() };
-            DB.messages.unshift(msg);
-            persist();
-            area.value = '';
-            if (DB.connected) {
-              try {
-                await addDoc(collection(dbFire, 'messages'), {
-                  userId: DB.user.id,
-                  text,
-                  createdAt: Timestamp.fromMillis(msg.createdAt),
-                  likes: []
-                });
-                await updateUserLastActive();
-              } catch (err) {
-                console.error('Erro ao enviar para Firestore:', err);
-              }
-            }
-            switchTab('feed');
-          };
-          row.appendChild(btn);
-          container.appendChild(area);
-          container.appendChild(row);
-          container.appendChild(document.createElement('div')).className = 'sep';
-          const tips = document.createElement('div');
-          tips.className = 'muted';
-          tips.innerHTML = 'Dica: clique no seu nome em qualquer mensagem para ver seu mural pessoal.';
-          container.appendChild(tips);
-          return container;
-        },
-        perfis() {
-          const container = document.createElement('div');
-          container.innerHTML = `<h3 style="margin-top:0">Perfis ativos (últimos 3 dias)</h3>`;
-          const grid = document.createElement('div');
-          grid.className = 'profiles';
-          const threeDays = 3 * 24 * 60 * 60 * 1000;
-          const activeUsers = DB.users.filter(u => (Date.now() - (u.lastActive || u.createdAt)) <= threeDays);
-          activeUsers.sort((a, b) => (b.lastActive || b.createdAt) - (a.lastActive || a.createdAt)).forEach(u => {
-            grid.appendChild(renderProfileCard(u));
-          });
-          if (activeUsers.length === 0) {
-            grid.innerHTML = `<div class="empty">Nenhum perfil ativo nos últimos 3 dias.</div>`;
-          }
-          container.appendChild(grid);
-          return container;
-        },
-        usuario(userId) {
-          const user = DB.users.find(u => u.id === userId);
-          const container = document.createElement('div');
-          if (!user) {
-            container.innerHTML = `<div class="empty">Usuário não encontrado.</div>`;
-            return container;
-          }
-          container.innerHTML = `<div class="row" style="justify-content:space-between;gap:8px;margin-bottom:8px">
-              <h3 style="margin:0">@${user.name}</h3>
-              <div class="chip">Mensagens deste perfil</div>
-            </div>`;
-          const list = document.createElement('div');
-          list.className = 'list';
-          DB.messages.filter(m => m.userId === userId).sort((a, b) => b.createdAt - a.createdAt).forEach(m => list.appendChild(renderMessage(m)));
-          if (list.children.length === 0) {
-            list.innerHTML = `<div class="empty">Este perfil ainda não postou nada.</div>`;
-          }
-          container.appendChild(list);
-          return container;
+    function countPostsToday() {
+      const today = new Date().toDateString();
+      return DB.messages.filter(m => m.userId === DB.user.id && new Date(m.createdAt).toDateString() === today).length;
+    }
+
+    const Views = {
+      feed() {
+        const container = document.createElement('div');
+        const postsToday = countPostsToday();
+        container.innerHTML = `<div class="row" style="justify-content:space-between;gap:8px;margin-bottom:8px">
+            <h3 style="margin:0">Feed público</h3>
+            <div class="chip">Posts hoje: ${postsToday}/3</div>
+          </div>`;
+        const list = document.createElement('div');
+        list.className = 'list';
+        const fiveDaysAgo = Date.now() - 5 * 24 * 3600 * 1000;
+        DB.messages.filter(m => m.createdAt > fiveDaysAgo).slice().sort((a, b) => b.createdAt - a.createdAt).forEach(msg => {
+          list.appendChild(renderMessage(msg));
+        });
+        if (list.children.length === 0) {
+          list.innerHTML = `<div class="empty">Sem mensagens ainda. Vá em <b>Postar</b> e mande a primeira!</div>`;
         }
-      };
-
-      function renderHeader() {
-        const me = DB.user;
-        const meLine = `Conectado como <b>${me.name}</b> ${DB.connected ? '• sincronizado ☁️' : ''}`;
-        $('#meLine').innerHTML = meLine;
-      }
-
-      function renderMyProfile() {
-        const me = DB.user;
-        const box = document.createElement('div');
-        box.className = 'profile';
-        const av = makeAvatar(me, '44px');
-        const col = document.createElement('div');
-        col.style.flex = '1';
-        col.innerHTML = `<div style="font-weight:800">${me.name}</div><div class="muted" style="font-size:12px">ID: ${me.id.slice(0, 6)}</div>`;
-        const btn = document.createElement('button');
-        btn.className = 'btn ghost';
-        btn.textContent = 'Ver meu mural';
-        btn.onclick = () => showUser(DB.user.id);
-        box.appendChild(av);
-        box.appendChild(col);
-        box.appendChild(btn);
-        const target = $('#myProfile');
-        target.innerHTML = '';
-        target.appendChild(box);
-      }
-
-      function makeAvatar(user, size = '44px') {
-        const d = document.createElement('div');
-        d.className = 'avatar';
-        d.style.width = size;
-        d.style.height = size;
-        d.style.background = user.bg;
-        d.textContent = user.emoji;
-        d.title = user.name;
-        return d;
-      }
-
-      function renderProfileCard(u) {
+        container.appendChild(list);
+        return container;
+      },
+      ranking() {
+        const container = document.createElement('div');
+        const postsToday = countPostsToday();
+        container.innerHTML = `<div class="row" style="justify-content:space-between;gap:8px;margin-bottom:8px">
+            <h3 style="margin:0">Ranking • Top 10 mais curtidas</h3>
+            <div class="chip">Posts hoje: ${postsToday}/3</div>
+          </div>`;
+        const list = document.createElement('div');
+        list.className = 'list';
+        DB.messages.slice().sort((a, b) => {
+          const la = countLikes(a.id), lb = countLikes(b.id);
+          if (lb !== la) return lb - la;
+          return b.createdAt - a.createdAt;
+        }).slice(0, 10).forEach(msg => list.appendChild(renderMessage(msg)));
+        if (DB.messages.length === 0) {
+          list.innerHTML = `<div class="empty">Nada por aqui ainda… Poste algo e ganhe curtidas!</div>`;
+        }
+        container.appendChild(list);
+        return container;
+      },
+      postar() {
+        const container = document.createElement('div');
+        container.innerHTML = `<h3 style="margin-top:0">Postar mensagem</h3>`;
+        const area = document.createElement('textarea');
+        area.placeholder = "Escreva algo gentil, curioso ou divertido…";
+        area.maxLength = 280;
+        const charCount = document.createElement('div');
+        charCount.className = 'muted';
+        charCount.style.textAlign = 'right';
+        charCount.textContent = '0/280';
         const row = document.createElement('div');
-        row.className = 'profile';
-        row.appendChild(makeAvatar(u));
-        const col = document.createElement('div');
-        col.style.flex = '1';
-        const link = document.createElement('a');
-        link.className = 'link';
-        link.textContent = u.name;
-        link.href = '#';
-        link.onclick = (e) => { e.preventDefault(); showUser(u.id); };
-        const small = document.createElement('div');
-        small.className = 'muted';
-        small.style.fontSize = '12px';
-        small.textContent = `Ativo ${timeAgo(u.lastActive || u.createdAt)}`;
-        col.appendChild(link);
-        col.appendChild(small);
-        row.appendChild(col);
+        row.className = 'row';
+        row.style.marginTop = '8px';
         const btn = document.createElement('button');
-        btn.className = 'btn ghost';
-        btn.textContent = 'Ver mural';
-        btn.onclick = () => showUser(u.id);
+        btn.className = 'btn primary';
+        btn.textContent = 'Publicar';
+        const postsToday = countPostsToday();
+        btn.disabled = postsToday >= 3;
+        area.oninput = () => {
+          charCount.textContent = `${area.value.length}/280`;
+          btn.disabled = postsToday >= 3 || area.value.trim().length === 0;
+        };
+        btn.onclick = async () => {
+          const text = area.value.trim();
+          if (text.length === 0 || postsToday >= 3) { area.focus(); return; }
+          DB.user.lastActive = Date.now();
+          const msg = { id: uid(), userId: DB.user.id, text, createdAt: Date.now() };
+          DB.messages.unshift(msg);
+          persist();
+          area.value = '';
+          if (DB.connected) {
+            try {
+              await addDoc(collection(dbFire, 'messages'), {
+                userId: DB.user.id,
+                text,
+                createdAt: Timestamp.fromMillis(msg.createdAt),
+                likes: []
+              });
+              await updateUserLastActive();
+            } catch (err) {
+              console.error('Erro ao enviar para Firestore:', err);
+            }
+          }
+          switchTab('feed');
+        };
+        if (postsToday >= 3) {
+          const limitNote = document.createElement('div');
+          limitNote.className = 'muted-note';
+          limitNote.style.color = 'var(--danger)';
+          limitNote.textContent = 'Você atingiu o limite de 3 posts por dia.';
+          container.appendChild(limitNote);
+        }
         row.appendChild(btn);
-        return row;
+        container.appendChild(area);
+        container.appendChild(charCount);
+        container.appendChild(row);
+        container.appendChild(document.createElement('div')).className = 'sep';
+        const tips = document.createElement('div');
+        tips.className = 'muted';
+        tips.innerHTML = 'Dica: clique no seu nome em qualquer mensagem para ver seu mural pessoal.';
+        container.appendChild(tips);
+        return container;
+      },
+      perfis() {
+        const container = document.createElement('div');
+        container.innerHTML = `<h3 style="margin-top:0">Perfis ativos (últimas 24 horas)</h3>`;
+        const grid = document.createElement('div');
+        grid.className = 'profiles';
+        const threeDays = 1 * 24 * 60 * 60 * 1000;
+        const activeUsers = DB.users.filter(u => (Date.now() - (u.lastActive || u.createdAt)) <= threeDays);
+        activeUsers.sort((a, b) => (b.lastActive || b.createdAt) - (a.lastActive || a.createdAt)).forEach(u => {
+          grid.appendChild(renderProfileCard(u));
+        });
+        if (activeUsers.length === 0) {
+          grid.innerHTML = `<div class="empty">Nenhum perfil ativo nos últimos 3 dias.</div>`;
+        }
+        container.appendChild(grid);
+        return container;
+      },
+      usuario(userId) {
+        const user = DB.users.find(u => u.id === userId);
+        const container = document.createElement('div');
+        if (!user) {
+          container.innerHTML = `<div class="empty">Usuário não encontrado.</div>`;
+          return container;
+        }
+        container.innerHTML = `<div class="row" style="justify-content:space-between;gap:8px;margin-bottom:8px">
+            <h3 style="margin:0">@${user.name}</h3>
+            <div class="chip">Mensagens deste perfil</div>
+          </div>`;
+        const list = document.createElement('div');
+        list.className = 'list';
+        DB.messages.filter(m => m.userId === userId).sort((a, b) => b.createdAt - a.createdAt).forEach(m => list.appendChild(renderMessage(m)));
+        if (list.children.length === 0) {
+          list.innerHTML = `<div class="empty">Este perfil ainda não postou nada.</div>`;
+        }
+        container.appendChild(list);
+        return container;
       }
+    };
 
-      function renderMessage(msg) {
-        const user = DB.users.find(u => u.id === msg.userId) || { name: '(desconhecido)', emoji: '❔', bg: '#ddd' };
-        const el = document.createElement('div');
-        el.className = 'msg';
-        const av = makeAvatar(user);
-        const content = document.createElement('div');
-        content.className = 'content';
-        const nameLink = document.createElement('a');
-        nameLink.className = 'link';
-        nameLink.href = '#';
-        nameLink.textContent = user.name;
-        nameLink.onclick = (e) => { e.preventDefault(); showUser(user.id); };
-        const meta = document.createElement('div');
-        meta.className = 'meta';
-        meta.innerHTML = `<span class="muted">${timeAgo(msg.createdAt)}</span>`;
-        const likeBtn = document.createElement('button');
-        likeBtn.className = 'btn like';
-        const liked = hasLiked(msg.id, DB.user.id);
-        likeBtn.innerHTML = liked ? `❤ ${countLikes(msg.id)}` : `♡ ${countLikes(msg.id)}`;
-        likeBtn.onclick = () => { toggleLike(msg.id, DB.user.id); updateView(); };
-        const text = document.createElement('div');
-        text.style.margin = '6px 0 8px';
-        text.textContent = msg.text;
-        const headerRow = document.createElement('div');
-        headerRow.className = 'row';
-        headerRow.style.justifyContent = 'space-between';
-        const left = document.createElement('div');
-        left.appendChild(nameLink);
-        headerRow.appendChild(left);
-        headerRow.appendChild(meta);
-        content.appendChild(headerRow);
-        content.appendChild(text);
-        el.appendChild(av);
-        el.appendChild(content);
-        el.appendChild(likeBtn);
-        return el;
-      }
+    function renderHeader() {
+      const me = DB.user;
+      const meLine = `Conectado como <b>${me.name}</b> ${DB.connected ? '✅' : ''}`;
+      $('#meLine').innerHTML = meLine;
+      const headerAv = $('#headerAvatar');
+      headerAv.innerHTML = '';
+      const av = makeAvatar(me);
+      av.classList.add('small');
+      headerAv.appendChild(av);
+    }
 
-      function hasLiked(messageId, userId) {
-        const set = new Set(DB.likes[messageId] || []);
-        return set.has(userId);
-      }
+    function renderMyProfile() {
+      const me = DB.user;
+      const box = document.createElement('div');
+      box.className = 'profile';
+      const av = makeAvatar(me, '44px');
+      const col = document.createElement('div');
+      col.style.flex = '1';
+      col.innerHTML = `<div style="font-weight:800">${me.name}</div><div class="muted" style="font-size:12px">ID: ${me.id.slice(0, 6)}</div>`;
+      const btn = document.createElement('button');
+      btn.className = 'btn ghost';
+      btn.textContent = 'Ver meu mural';
+      btn.onclick = () => showUser(DB.user.id);
+      box.appendChild(av);
+      box.appendChild(col);
+      box.appendChild(btn);
+      const target = $('#myProfile');
+      target.innerHTML = '';
+      target.appendChild(box);
+    }
 
-      function countLikes(messageId) {
-        const set = new Set(DB.likes[messageId] || []);
-        return set.size;
-      }
+    function makeAvatar(user, size = '44px') {
+      const d = document.createElement('div');
+      d.className = 'avatar';
+      d.style.width = size;
+      d.style.height = size;
+      d.style.background = user.bg;
+      d.textContent = user.emoji;
+      d.title = user.name;
+      return d;
+    }
 
-      async function toggleLike(messageId, userId) {
-        DB.user.lastActive = Date.now();
-        let arr = new Set(DB.likes[messageId] || []);
-        const liked = arr.has(userId);
-        if (liked) arr.delete(userId);
-        else arr.add(userId);
-        DB.likes[messageId] = Array.from(arr);
-        persist();
-        if (DB.connected) {
-          try {
-            const localMsg = DB.messages.find(m => m.id === messageId);
-            if (localMsg && localMsg._firestoreId) {
-              const docRef = doc(dbFire, 'messages', localMsg._firestoreId);
-              if (liked) {
-                await updateDoc(docRef, { likes: arrayRemove(DB.user.id) });
-              } else {
-                await updateDoc(docRef, { likes: arrayUnion(DB.user.id) });
-              }
+    function renderProfileCard(u) {
+      const row = document.createElement('div');
+      row.className = 'profile';
+      row.appendChild(makeAvatar(u));
+      const col = document.createElement('div');
+      col.style.flex = '1';
+      const link = document.createElement('a');
+      link.className = 'link';
+      link.textContent = u.name;
+      link.href = '#';
+      link.onclick = (e) => { e.preventDefault(); showUser(u.id); };
+      const small = document.createElement('div');
+      small.className = 'muted';
+      small.style.fontSize = '12px';
+      small.textContent = `Ativo ${timeAgo(u.lastActive || u.createdAt)}`;
+      col.appendChild(link);
+      col.appendChild(small);
+      row.appendChild(col);
+      const btn = document.createElement('button');
+      btn.className = 'btn ghost';
+      btn.textContent = 'Ver mural';
+      btn.onclick = () => showUser(u.id);
+      row.appendChild(btn);
+      return row;
+    }
+
+    function renderMessage(msg) {
+      const user = DB.users.find(u => u.id === msg.userId) || { name: '(desconhecido)', emoji: '❔', bg: '#ddd' };
+      const el = document.createElement('div');
+      el.className = 'msg';
+      const av = makeAvatar(user);
+      const content = document.createElement('div');
+      content.className = 'content';
+      const nameLink = document.createElement('a');
+      nameLink.className = 'link';
+      nameLink.href = '#';
+      nameLink.textContent = user.name;
+      nameLink.onclick = (e) => { e.preventDefault(); showUser(user.id); };
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.innerHTML = `<span class="muted">${timeAgo(msg.createdAt)}</span>`;
+      const likeBtn = document.createElement('button');
+      likeBtn.className = 'btn like';
+      const liked = hasLiked(msg.id, DB.user.id);
+      likeBtn.innerHTML = liked ? `❤ ${countLikes(msg.id)}` : `♡ ${countLikes(msg.id)}`;
+      likeBtn.onclick = () => { toggleLike(msg.id, DB.user.id); updateView(); };
+      const text = document.createElement('div');
+      text.className = 'ranking-text';
+      text.style.margin = '6px 0 8px';
+      text.textContent = msg.text;
+      const headerRow = document.createElement('div');
+      headerRow.className = 'row';
+      headerRow.style.justifyContent = 'space-between';
+      const left = document.createElement('div');
+      left.appendChild(nameLink);
+      headerRow.appendChild(left);
+      headerRow.appendChild(meta);
+      content.appendChild(headerRow);
+      content.appendChild(text);
+      el.appendChild(av);
+      el.appendChild(content);
+      el.appendChild(likeBtn);
+      return el;
+    }
+
+    function hasLiked(messageId, userId) {
+      const set = new Set(DB.likes[messageId] || []);
+      return set.has(userId);
+    }
+
+    function countLikes(messageId) {
+      const set = new Set(DB.likes[messageId] || []);
+      return set.size;
+    }
+
+    async function toggleLike(messageId, userId) {
+      DB.user.lastActive = Date.now();
+      let arr = new Set(DB.likes[messageId] || []);
+      const liked = arr.has(userId);
+      if (liked) arr.delete(userId);
+      else arr.add(userId);
+      DB.likes[messageId] = Array.from(arr);
+      persist();
+      if (DB.connected) {
+        try {
+          const localMsg = DB.messages.find(m => m.id === messageId);
+          if (localMsg && localMsg._firestoreId) {
+            const docRef = doc(dbFire, 'messages', localMsg._firestoreId);
+            if (liked) {
+              await updateDoc(docRef, { likes: arrayRemove(DB.user.id) });
             } else {
-              if (localMsg) {
-                const q = query(collection(dbFire, 'messages'), where('createdAt', '==', Timestamp.fromMillis(localMsg.createdAt)), where('userId', '==', localMsg.userId), limit(1));
-                const snap = await getDocs(q);
-                if (!snap.empty) {
-                  const docRef = snap.docs[0].ref;
-                  if (liked) await updateDoc(docRef, { likes: arrayRemove(DB.user.id) });
-                  else await updateDoc(docRef, { likes: arrayUnion(DB.user.id) });
-                }
+              await updateDoc(docRef, { likes: arrayUnion(DB.user.id) });
+            }
+          } else {
+            if (localMsg) {
+              const q = query(collection(dbFire, 'messages'), where('createdAt', '==', Timestamp.fromMillis(localMsg.createdAt)), where('userId', '==', localMsg.userId), limit(1));
+              const snap = await getDocs(q);
+              if (!snap.empty) {
+                const docRef = snap.docs[0].ref;
+                if (liked) await updateDoc(docRef, { likes: arrayRemove(DB.user.id) });
+                else await updateDoc(docRef, { likes: arrayUnion(DB.user.id) });
               }
             }
-            await updateUserLastActive();
-          } catch (err) {
-            console.error('Erro ao atualizar likes na nuvem:', err);
           }
+          await updateUserLastActive();
+        } catch (err) {
+          console.error('Erro ao atualizar likes na nuvem:', err);
         }
       }
+    }
 
-      function switchTab(tab) {
-        $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-        if (tab === 'feed') mount(Views.feed());
-        if (tab === 'ranking') mount(Views.ranking());
-        if (tab === 'postar') mount(Views.postar());
-        if (tab === 'perfis') mount(Views.perfis());
-        location.hash = '#' + tab;
+    function switchTab(tab) {
+      $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+      if (tab === 'feed') mount(Views.feed());
+      if (tab === 'ranking') mount(Views.ranking());
+      if (tab === 'postar') mount(Views.postar());
+      if (tab === 'perfis') mount(Views.perfis());
+      location.hash = '#' + tab;
+    }
+
+    function showUser(userId) {
+      $$('.tab').forEach(t => t.classList.remove('active'));
+      mount(Views.usuario(userId));
+      location.hash = '#user:' + userId;
+    }
+
+    function mount(node) {
+      const root = $('#view');
+      root.innerHTML = '';
+      root.appendChild(node);
+    }
+
+    function updateView() {
+      const h = location.hash.slice(1);
+      if (h.startsWith('user:')) { mount(Views.usuario(h.split(':')[1])); return; }
+      if (h === 'ranking') switchTab('ranking');
+      else if (h === 'postar') switchTab('postar');
+      else if (h === 'perfis') switchTab('perfis');
+      else switchTab('feed');
+    }
+
+    function timeAgo(ts) {
+      const s = Math.floor((Date.now() - ts) / 1000);
+      if (s < 60) return `${s}s`;
+      const m = Math.floor(s / 60);
+      if (m < 60) return `${m}m`;
+      const h = Math.floor(m / 60);
+      if (h < 24) return `${h}h`;
+      const d = Math.floor(h / 24);
+      return `${d}d`;
+    }
+
+    async function updateUserLastActive() {
+      if (DB.connected) {
+        try {
+          const userDocRef = doc(dbFire, 'users', DB.user.id);
+          await setDoc(userDocRef, { lastActive: Timestamp.fromMillis(DB.user.lastActive) }, { merge: true });
+        } catch (e) {
+          console.warn('Não foi possível atualizar lastActive na nuvem', e);
+        }
       }
+    }
 
-      function showUser(userId) {
-        $$('.tab').forEach(t => t.classList.remove('active'));
-        mount(Views.usuario(userId));
-        location.hash = '#user:' + userId;
+    async function startFirestoreSync(firebaseUid) {
+      DB.connected = true;
+      renderHeader();
+      try {
+        const usersCol = collection(dbFire, 'users');
+        DB.usersUnsub = onSnapshot(usersCol, snapshot => {
+          snapshot.docChanges().forEach(change => {
+            const data = change.doc.data();
+            const u = {
+              id: data.id,
+              name: data.name,
+              emoji: data.emoji,
+              bg: data.bg,
+              createdAt: data.createdAt?.toMillis?.() ?? Date.now(),
+              lastActive: data.lastActive?.toMillis?.() ?? data.createdAt?.toMillis?.() ?? Date.now()
+            };
+            const idx = DB.users.findIndex(x => x.id === u.id);
+            if (change.type === 'added' || change.type === 'modified') {
+              if (idx === -1) DB.users.push(u);
+              else DB.users[idx] = u;
+            } else if (change.type === 'removed') {
+              if (idx !== -1) DB.users.splice(idx, 1);
+            }
+          });
+          persist();
+          updateView();
+        });
+      } catch (err) { console.warn('users listener failed', err); }
+      try {
+        const q = query(collection(dbFire, 'messages'), orderBy('createdAt', 'desc'));
+        if (DB.firestoreListenerUnsub) DB.firestoreListenerUnsub();
+        DB.firestoreListenerUnsub = onSnapshot(q, snapshot => {
+          const messages = [];
+          const likesMap = {};
+          snapshot.forEach(docSnap => {
+            const d = docSnap.data();
+            const ms = {
+              id: docSnap.id + '-' + (d.createdAt?.toMillis?.() ?? Date.now()),
+              _firestoreId: docSnap.id,
+              userId: d.userId,
+              text: d.text,
+              createdAt: d.createdAt?.toMillis?.() ?? Date.now()
+            };
+            messages.push(ms);
+            likesMap[ms.id] = Array.isArray(d.likes) ? d.likes.slice() : [];
+          });
+          DB.messages = messages;
+          DB.likes = likesMap;
+          persist();
+          updateView();
+        });
+      } catch (err) { console.warn('messages listener failed', err); }
+      try {
+        const userDocRef = doc(dbFire, 'users', DB.user.id);
+        await setDoc(userDocRef, {
+          id: DB.user.id,
+          name: DB.user.name,
+          emoji: DB.user.emoji,
+          bg: DB.user.bg,
+          createdAt: Timestamp.fromMillis(DB.user.createdAt),
+          lastActive: Timestamp.fromMillis(DB.user.lastActive)
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Não foi possível garantir usuário na nuvem', err);
       }
+    }
 
-      function mount(node) {
-        const root = $('#view');
-        root.innerHTML = '';
-        root.appendChild(node);
+    function stopFirestoreSync() {
+      DB.connected = false;
+      if (DB.firestoreListenerUnsub) { DB.firestoreListenerUnsub(); DB.firestoreListenerUnsub = null; }
+      if (DB.usersUnsub) { DB.usersUnsub(); DB.usersUnsub = null; }
+      renderHeader();
+    }
+
+    hydrate();
+    updateView();
+    try {
+      signInAnonymously(auth).then(() => {
+        console.log('Tentando autenticar anonimamente...');
+      }).catch((error) => {
+        console.warn('Erro ao signInAnonymously', error);
+      });
+      onAuthStateChanged(auth, user => {
+        if (user) {
+          console.log('Autenticado anon:', user.uid);
+          DB.user.lastActive = Date.now();
+          startFirestoreSync(user.uid).then(() => updateUserLastActive()).catch(err => console.error(err));
+        } else {
+          console.log('Não autenticado');
+          stopFirestoreSync();
+        }
+      });
+    } catch (err) {
+      console.warn('Firebase init falhou', err);
+    }
+
+    $$('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+    window.addEventListener('hashchange', updateView);
+
+    function updateViewAndPersist() { persist(); updateView(); }
+    window.updateView = updateViewAndPersist;
+
+    async function deriveIdFromCode(code) {
+      const normalized = String(code).trim();
+      const enc = new TextEncoder().encode('transfer-v1:' + normalized);
+      const hashBuf = await crypto.subtle.digest('SHA-256', enc);
+      const h = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      return 'anon-' + h.slice(0, 12);
+    }
+
+    function generateTransferCode(len = 16) {
+      const arr = new Uint8Array(Math.ceil(len * 0.6));
+      crypto.getRandomValues(arr);
+      let s = '';
+      for (let i = 0; i < arr.length; i++) {
+        s += arr[i].toString(36).padStart(2, '0');
       }
+      s = s.replace(/[^a-z0-9]/gi, '').slice(0, len);
+      return s.toUpperCase();
+    }
 
-      function updateView() {
-        const h = location.hash.slice(1);
-        if (h.startsWith('user:')) { mount(Views.usuario(h.split(':')[1])); return; }
-        if (h === 'ranking') switchTab('ranking');
-        else if (h === 'postar') switchTab('postar');
-        else if (h === 'perfis') switchTab('perfis');
-        else switchTab('feed');
+    function showModal(html) {
+      const root = $('#modalRoot');
+      root.innerHTML = '';
+      root.style.display = 'grid';
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+      modal.innerHTML = `<div class="box">${html}</div>`;
+      modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+      root.appendChild(modal);
+    }
+
+    function closeModal() {
+      const root = $('#modalRoot');
+      root.style.display = 'none';
+      root.innerHTML = '';
+    }
+
+    async function transferOwnership(oldId, newId) {
+      if (oldId === newId) return;
+      DB.messages.forEach(m => {
+        if (m.userId === oldId) m.userId = newId;
+      });
+      Object.keys(DB.likes).forEach(mid => {
+        let arr = DB.likes[mid];
+        if (arr.includes(oldId)) {
+          DB.likes[mid] = arr.filter(uid => uid !== oldId);
+          if (!DB.likes[mid].includes(newId)) DB.likes[mid].push(newId);
+        }
+      });
+      const idx = DB.users.findIndex(u => u.id === oldId);
+      if (idx !== -1) DB.users.splice(idx, 1);
+      if (DB.connected) {
+        try {
+          const qm = query(collection(dbFire, 'messages'), where('userId', '==', oldId));
+          const snapm = await getDocs(qm);
+          for (let ds of snapm.docs) {
+            await updateDoc(ds.ref, { userId: newId });
+          }
+          const ql = query(collection(dbFire, 'messages'), where('likes', 'array-contains', oldId));
+          const snapl = await getDocs(ql);
+          for (let ds of snapl.docs) {
+            await updateDoc(ds.ref, { likes: arrayRemove(oldId) });
+            await updateDoc(ds.ref, { likes: arrayUnion(newId) });
+          }
+          const oldRef = doc(dbFire, 'users', oldId);
+          await deleteDoc(oldRef);
+        } catch (err) {
+          console.error('Error transferring ownership:', err);
+        }
       }
+      persist();
+    }
 
-      function timeAgo(ts) {
-        const s = Math.floor((Date.now() - ts) / 1000);
-        if (s < 60) return `${s}s`;
-        const m = Math.floor(s / 60);
-        if (m < 60) return `${m}m`;
-        const h = Math.floor(m / 60);
-        if (h < 24) return `${h}h`;
-        const d = Math.floor(h / 24);
-        return `${d}d`;
-      }
-
-      async function updateUserLastActive() {
+    async function handleGenerateCode() {
+      const code = generateTransferCode(16);
+      const derivedId = await deriveIdFromCode(code);
+      const prev = DB.user;
+      DB.user = { id: derivedId, name: prev.name, emoji: prev.emoji, bg: prev.bg, createdAt: prev.createdAt ?? Date.now(), lastActive: Date.now(), lastReseed: prev.lastReseed || 0 };
+      if (!DB.users.find(u => u.id === DB.user.id)) DB.users.push(DB.user);
+      await transferOwnership(prev.id, derivedId);
+      persist();
+      try {
         if (DB.connected) {
-          try {
-            const userDocRef = doc(dbFire, 'users', DB.user.id);
-            await setDoc(userDocRef, { lastActive: Timestamp.fromMillis(DB.user.lastActive) }, { merge: true });
-          } catch (e) {
-            console.warn('Não foi possível atualizar lastActive na nuvem', e);
-          }
-        }
-      }
-
-      async function startFirestoreSync(firebaseUid) {
-        DB.connected = true;
-        renderHeader();
-        try {
-          const usersCol = collection(dbFire, 'users');
-          DB.usersUnsub = onSnapshot(usersCol, snapshot => {
-            snapshot.docChanges().forEach(change => {
-              const data = change.doc.data();
-              const u = {
-                id: data.id,
-                name: data.name,
-                emoji: data.emoji,
-                bg: data.bg,
-                createdAt: data.createdAt?.toMillis?.() ?? Date.now(),
-                lastActive: data.lastActive?.toMillis?.() ?? data.createdAt?.toMillis?.() ?? Date.now()
-              };
-              const idx = DB.users.findIndex(x => x.id === u.id);
-              if (change.type === 'added' || change.type === 'modified') {
-                if (idx === -1) DB.users.push(u);
-                else DB.users[idx] = u;
-              } else if (change.type === 'removed') {
-                if (idx !== -1) DB.users.splice(idx, 1);
-              }
-            });
-            persist();
-            updateView();
-          });
-        } catch (err) { console.warn('users listener failed', err); }
-        try {
-          const q = query(collection(dbFire, 'messages'), orderBy('createdAt', 'desc'));
-          if (DB.firestoreListenerUnsub) DB.firestoreListenerUnsub();
-          DB.firestoreListenerUnsub = onSnapshot(q, snapshot => {
-            const messages = [];
-            const likesMap = {};
-            snapshot.forEach(docSnap => {
-              const d = docSnap.data();
-              const ms = {
-                id: docSnap.id + '-' + (d.createdAt?.toMillis?.() ?? Date.now()),
-                _firestoreId: docSnap.id,
-                userId: d.userId,
-                text: d.text,
-                createdAt: d.createdAt?.toMillis?.() ?? Date.now()
-              };
-              messages.push(ms);
-              likesMap[ms.id] = Array.isArray(d.likes) ? d.likes.slice() : [];
-            });
-            DB.messages = messages;
-            DB.likes = likesMap;
-            persist();
-            updateView();
-          });
-        } catch (err) { console.warn('messages listener failed', err); }
-        try {
           const userDocRef = doc(dbFire, 'users', DB.user.id);
           await setDoc(userDocRef, {
             id: DB.user.id,
@@ -690,125 +877,58 @@
             createdAt: Timestamp.fromMillis(DB.user.createdAt),
             lastActive: Timestamp.fromMillis(DB.user.lastActive)
           }, { merge: true });
-        } catch (err) {
-          console.warn('Não foi possível garantir usuário na nuvem', err);
         }
-      }
+      } catch (e) { console.warn('Não foi possível salvar usuário gerado na nuvem', e); }
+      showModal(`
+        <h3>Código de transferência gerado</h3>
+        <div style="margin-top:8px">Use este código em outro navegador para carregar o <b>mesmo</b> perfil anônimo:</div>
+        <div style="margin-top:12px"><div class="code" id="transferCode">${code}</div></div>
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button class="btn primary" id="copyCode">Copiar código</button>
+          <button class="btn" id="closeModalBtn">Fechar</button>
+        </div>
+        <div class="muted-note">Observação: quem tiver este código poderá usar este mesmo ID anônimo. Guarde com responsabilidade.</div>
+      `);
+      $('#copyCode').onclick = () => {
+        navigator.clipboard.writeText(code).then(() => alert('Código copiado!'));
+      };
+      $('#closeModalBtn').onclick = closeModal;
+    }
 
-      function stopFirestoreSync() {
-        DB.connected = false;
-        if (DB.firestoreListenerUnsub) { DB.firestoreListenerUnsub(); DB.firestoreListenerUnsub = null; }
-        if (DB.usersUnsub) { DB.usersUnsub(); DB.usersUnsub = null; }
-        renderHeader();
-      }
-
-      hydrate();
-      updateView();
-      try {
-        signInAnonymously(auth).then(() => {
-          console.log('Tentando autenticar anonimamente...');
-        }).catch((error) => {
-          console.warn('Erro ao signInAnonymously', error);
-        });
-        onAuthStateChanged(auth, user => {
-          if (user) {
-            console.log('Autenticado anon:', user.uid);
-            DB.user.lastActive = Date.now();
-            startFirestoreSync(user.uid).then(() => updateUserLastActive()).catch(err => console.error(err));
-          } else {
-            console.log('Não autenticado');
-            stopFirestoreSync();
-          }
-        });
-      } catch (err) {
-        console.warn('Firebase init falhou', err);
-      }
-
-      $$('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
-      window.addEventListener('hashchange', updateView);
-
-      function updateViewAndPersist() { persist(); updateView(); }
-      window.updateView = updateViewAndPersist;
-
-      async function deriveIdFromCode(code) {
-        const normalized = String(code).trim();
-        const enc = new TextEncoder().encode('transfer-v1:' + normalized);
-        const hashBuf = await crypto.subtle.digest('SHA-256', enc);
-        const h = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
-        return 'anon-' + h.slice(0, 12);
-      }
-
-      function generateTransferCode(len = 16) {
-        const arr = new Uint8Array(Math.ceil(len * 0.6));
-        crypto.getRandomValues(arr);
-        let s = '';
-        for (let i = 0; i < arr.length; i++) {
-          s += arr[i].toString(36).padStart(2, '0');
-        }
-        s = s.replace(/[^a-z0-9]/gi, '').slice(0, len);
-        return s.toUpperCase();
-      }
-
-      function showModal(html) {
-        const root = $('#modalRoot');
-        root.innerHTML = '';
-        root.style.display = 'grid';
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `<div class="box">${html}</div>`;
-        modal.onclick = (e) => { if (e.target === modal) closeModal(); };
-        root.appendChild(modal);
-      }
-
-      function closeModal() {
-        const root = $('#modalRoot');
-        root.style.display = 'none';
-        root.innerHTML = '';
-      }
-
-      async function transferOwnership(oldId, newId) {
-        if (oldId === newId) return;
-        DB.messages.forEach(m => {
-          if (m.userId === oldId) m.userId = newId;
-        });
-        Object.keys(DB.likes).forEach(mid => {
-          let arr = DB.likes[mid];
-          if (arr.includes(oldId)) {
-            DB.likes[mid] = arr.filter(uid => uid !== oldId);
-            if (!DB.likes[mid].includes(newId)) DB.likes[mid].push(newId);
-          }
-        });
-        const idx = DB.users.findIndex(u => u.id === oldId);
-        if (idx !== -1) DB.users.splice(idx, 1);
-        if (DB.connected) {
-          try {
-            const qm = query(collection(dbFire, 'messages'), where('userId', '==', oldId));
-            const snapm = await getDocs(qm);
-            for (let ds of snapm.docs) {
-              await updateDoc(ds.ref, { userId: newId });
-            }
-            const ql = query(collection(dbFire, 'messages'), where('likes', 'array-contains', oldId));
-            const snapl = await getDocs(ql);
-            for (let ds of snapl.docs) {
-              await updateDoc(ds.ref, { likes: arrayRemove(oldId) });
-              await updateDoc(ds.ref, { likes: arrayUnion(newId) });
-            }
-            const oldRef = doc(dbFire, 'users', oldId);
-            await deleteDoc(oldRef);
-          } catch (err) {
-            console.error('Error transferring ownership:', err);
-          }
-        }
-        persist();
-      }
-
-      async function handleGenerateCode() {
-        const code = generateTransferCode(16);
+    async function handleImportCode() {
+      showModal(`
+        <h3>Importar código</h3>
+        <div style="margin-top:6px">Cole o código de transferência recebido:</div>
+        <div style="margin-top:10px"><input id="inputCode" type="text" placeholder="Ex: A1B2C3D4E5F6G7H8" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd"></div>
+        <div style="margin-top:12px;display:flex;gap:8px">
+          <button class="btn primary" id="doImport">Importar e usar este perfil</button>
+          <button class="btn" id="cancelImport">Cancelar</button>
+        </div>
+        <div class="muted-note">Ao importar, você passará a usar o mesmo ID associado ao código.</div>
+      `);
+      $('#cancelImport').onclick = closeModal;
+      $('#doImport').onclick = async () => {
+        const code = $('#inputCode').value.trim();
+        if (!code) { alert('Cole um código válido.'); return; }
         const derivedId = await deriveIdFromCode(code);
-        const prev = DB.user;
-        DB.user = { id: derivedId, name: prev.name, emoji: prev.emoji, bg: prev.bg, createdAt: prev.createdAt ?? Date.now(), lastActive: Date.now() };
-        if (!DB.users.find(u => u.id === DB.user.id)) DB.users.push(DB.user);
-        await transferOwnership(prev.id, derivedId);
+        const oldId = DB.user.id;
+        let existing = DB.users.find(u => u.id === derivedId);
+        if (existing) {
+          DB.user = { ...existing, lastActive: Date.now(), lastReseed: existing.lastReseed || 0 };
+        } else {
+          const newUser = {
+            id: derivedId,
+            name: DB.user.name + ' (import)',
+            emoji: DB.user.emoji,
+            bg: DB.user.bg,
+            createdAt: Date.now(),
+            lastActive: Date.now(),
+            lastReseed: 0
+          };
+          DB.users.push(newUser);
+          DB.user = newUser;
+        }
+        await transferOwnership(oldId, derivedId);
         persist();
         try {
           if (DB.connected) {
@@ -822,78 +942,22 @@
               lastActive: Timestamp.fromMillis(DB.user.lastActive)
             }, { merge: true });
           }
-        } catch (e) { console.warn('Não foi possível salvar usuário gerado na nuvem', e); }
-        showModal(`
-          <h3>Código de transferência gerado</h3>
-          <div style="margin-top:8px">Use este código em outro navegador para carregar o <b>mesmo</b> perfil anônimo:</div>
-          <div style="margin-top:12px"><div class="code" id="transferCode">${code}</div></div>
-          <div style="margin-top:12px;display:flex;gap:8px">
-            <button class="btn primary" id="copyCode">Copiar código</button>
-            <button class="btn" id="closeModalBtn">Fechar</button>
-          </div>
-          <div class="muted-note">Observação: quem tiver este código poderá usar este mesmo ID anônimo. Guarde com responsabilidade.</div>
-        `);
-        $('#copyCode').onclick = () => {
-          navigator.clipboard.writeText(code).then(() => alert('Código copiado!'));
-        };
-        $('#closeModalBtn').onclick = closeModal;
-      }
+        } catch (e) { console.warn('Não foi possível garantir usuário na nuvem', e); }
+        closeModal();
+        alert('Perfil importado. Agora você usa o mesmo ID neste navegador.');
+      };
+    }
 
-      async function handleImportCode() {
-        showModal(`
-          <h3>Importar código</h3>
-          <div style="margin-top:6px">Cole o código de transferência recebido:</div>
-          <div style="margin-top:10px"><input id="inputCode" type="text" placeholder="Ex: A1B2C3D4E5F6G7H8" style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd"></div>
-          <div style="margin-top:12px;display:flex;gap:8px">
-            <button class="btn primary" id="doImport">Importar e usar este perfil</button>
-            <button class="btn" id="cancelImport">Cancelar</button>
-          </div>
-          <div class="muted-note">Ao importar, você passará a usar o mesmo ID associado ao código.</div>
-        `);
-        $('#cancelImport').onclick = closeModal;
-        $('#doImport').onclick = async () => {
-          const code = $('#inputCode').value.trim();
-          if (!code) { alert('Cole um código válido.'); return; }
-          const derivedId = await deriveIdFromCode(code);
-          const oldId = DB.user.id;
-          let existing = DB.users.find(u => u.id === derivedId);
-          if (existing) {
-            DB.user = { ...existing, lastActive: Date.now() };
-          } else {
-            const newUser = {
-              id: derivedId,
-              name: DB.user.name + ' (import)',
-              emoji: DB.user.emoji,
-              bg: DB.user.bg,
-              createdAt: Date.now(),
-              lastActive: Date.now()
-            };
-            DB.users.push(newUser);
-            DB.user = newUser;
-          }
-          await transferOwnership(oldId, derivedId);
-          persist();
-          try {
-            if (DB.connected) {
-              const userDocRef = doc(dbFire, 'users', DB.user.id);
-              await setDoc(userDocRef, {
-                id: DB.user.id,
-                name: DB.user.name,
-                emoji: DB.user.emoji,
-                bg: DB.user.bg,
-                createdAt: Timestamp.fromMillis(DB.user.createdAt),
-                lastActive: Timestamp.fromMillis(DB.user.lastActive)
-              }, { merge: true });
-            }
-          } catch (e) { console.warn('Não foi possível garantir usuário na nuvem', e); }
-          closeModal();
-          alert('Perfil importado. Agora você usa o mesmo ID neste navegador.');
-        };
+    function handleReseed() {
+      const now = Date.now();
+      if (now - (DB.user.lastReseed || 0) < 24 * 3600 * 1000) {
+        alert('Só permitido gerar novo perfil aleatório 1 vez por dia.');
+        return;
       }
-
-      function handleReseed() {
+      if (confirm('Gerar um novo perfil aleatório (isso mudará seu ID local)?')) {
         const nv = newRandomUser();
         DB.user = nv;
+        DB.user.lastReseed = now;
         if (!DB.users.find(u => u.id === nv.id)) DB.users.push(nv);
         persist();
         (async () => {
@@ -912,12 +976,11 @@
           } catch (e) {}
         })();
       }
+    }
 
-      $('#genCodeBtn').addEventListener('click', handleGenerateCode);
-      $('#importCodeBtn').addEventListener('click', handleImportCode);
-      $('#reseedBtn').addEventListener('click', () => {
-        if (confirm('Gerar um novo perfil aleatório (isso mudará seu ID local)?')) handleReseed();
-      });
-    </script>
-  </body>
+    $('#genCodeBtn').addEventListener('click', handleGenerateCode);
+    $('#importCodeBtn').addEventListener('click', handleImportCode);
+    $('#reseedBtn').addEventListener('click', handleReseed);
+  </script>
+</body>
 </html>
