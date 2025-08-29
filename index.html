@@ -39,8 +39,8 @@
       .tabs {
         position: fixed;
         bottom: 16px;
-        left: 50%;
-        transform: translateX(-50%);
+        left: 0;
+        right: 0;
         z-index: 30;
         background: rgba(255, 255, 255, .95);
         backdrop-filter: blur(8px);
@@ -50,6 +50,9 @@
         display: flex;
         gap: 8px;
         flex-wrap: nowrap;
+        margin: 0 auto;
+        max-width: 1000px;
+        width: calc(100% - 32px);
       }
       .tab {
         padding: 8px 16px;
@@ -67,9 +70,13 @@
         color: #fff;
         border-color: transparent;
       }
-      main { padding: 20px; padding-bottom: 80px; } /* Adicionado padding-bottom para evitar sobreposição com tabs */
+      main { 
+        padding: 20px;
+        padding-bottom: 100px; /* Aumentado para garantir que o conteúdo não fique sob a barra fixa */
+        min-height: calc(100vh - 100px); /* Garante que o main ocupe a altura mínima da tela */
+      }
       .grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
-      @media (min-width: 880px) { .grid { grid-template-columns: 1.2fr .8fr; } }
+      @media (min-width: 880px) { .grid { grid-template-columns: 1fr; } }
       .card {
         background: var(--card);
         border: 1px solid var(--secondary);
@@ -216,6 +223,17 @@
           <div class="muted" id="meLine">Conectando…</div>
         </div>
       </div>
+      <div>
+        <h4 style="margin:0 0 8px">Sincronizar entre navegadores</h4>
+        <div class="muted" style="font-size:13px">
+          Gere um <b>código de transferência</b> e cole-o em outro navegador para usar o mesmo ID anônimo.
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn primary" id="genCodeBtn">Exportar código</button>
+          <button class="btn" id="importCodeBtn">Importar código</button>
+          <button class="btn" id="reseedBtn">Novo perfil</button>
+        </div>
+      </div>
     </div>
   </header>
   <main class="wrap">
@@ -223,25 +241,6 @@
       <section class="card pad" id="view">
         <!-- Views render here -->
       </section>
-      <aside class="card pad">
-        <h3 style="margin:0 0 8px">Meu Perfil</h3>
-        <div id="myProfile"></div>
-        <div class="sep"></div>
-        <div>
-          <h4 style="margin:0 0 8px">Sincronizar entre navegadores</h4>
-          <div class="muted" style="font-size:13px">
-            Gere um <b>código de transferência</b> e cole-o em outro navegador para usar o mesmo ID anônimo.
-          </div>
-          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn primary" id="genCodeBtn">Gerar código de transferência</button>
-            <button class="btn" id="importCodeBtn">Importar código</button>
-            <button class="btn" id="reseedBtn">Gerar novo perfil (aleatório)</button>
-          </div>
-          <div class="muted-note">Aviso: quem tiver o código poderá assumir este perfil anônimo. Compartilhe com responsabilidade.</div>
-        </div>
-        <div class="sep"></div>
-        <div class="foot">Cadastro é anônimo. Avatar e nome aleatórios. Dados ficam localmente e — quando conectado — sincronizados com Firestore.</div>
-      </aside>
     </div>
   </main>
   <nav class="tabs">
@@ -249,6 +248,7 @@
     <button class="tab" data-tab="ranking">Ranking</button>
     <button class="tab" data-tab="postar">Postar</button>
     <button class="tab" data-tab="perfis">Perfis</button>
+    <button class="tab" data-tab="sobre">Sobre</button>
   </nav>
   <div id="modalRoot" style="display:none"></div>
   <script type="module">
@@ -308,7 +308,7 @@
       DB.user = store.get('anon:user') || newRandomUser();
       DB.user.lastActive = Date.now();
       DB.users = store.get('anon:users', []);
-      if (!DB.users.find(u => u.id === DB.user.id)) DB.users.push(DB.user);            
+      if (!DB.users.find(u => u.id === DB.user.id)) DB.users.push(DB.user);
       DB.messages = store.get('anon:messages', seedMessages());
       DB.likes = store.get('anon:likes', {});
       persist();
@@ -316,11 +316,10 @@
 
     function persist() {
       store.set('anon:user', DB.user);
-      store.set('anon:users', DB.users);      
+      store.set('anon:users', DB.users);
       store.set('anon:messages', DB.messages);
       store.set('anon:likes', DB.likes);
       renderHeader();
-      renderMyProfile();
     }
 
     function seedMessages() {
@@ -336,6 +335,21 @@
     function countPostsToday() {
       const today = new Date().toDateString();
       return DB.messages.filter(m => m.userId === DB.user.id && new Date(m.createdAt).toDateString() === today).length;
+    }
+
+    function getUserBadges(userId) {
+      let badges = [];
+      const userPosts = DB.messages.filter(m => m.userId === userId);
+      const hasPosted = userPosts.length > 0;
+      const hasLiked = Object.values(DB.likes).some(likes => likes.includes(userId));
+      const postsToday = userPosts.filter(m => new Date(m.createdAt).toDateString() === new Date().toDateString()).length;
+      const hasReceivedLike = DB.messages.some(m => m.userId === userId && countLikes(m.id) > 0);
+
+      if (hasPosted || hasLiked) badges.push('🔅');
+      if (hasReceivedLike) badges.push('🫟');
+      if (postsToday === 3) badges.push('♾️');
+
+      return badges.join('');
     }
 
     const Views = {
@@ -356,6 +370,12 @@
           list.innerHTML = `<div class="empty">Sem mensagens ainda. Vá em <b>Postar</b> e mande a primeira!</div>`;
         }
         container.appendChild(list);
+        // Adiciona container branco ao final, sem borda e com altura reduzida
+        const spacer = document.createElement('div');
+        spacer.className = 'card pad';
+        spacer.style.height = '80px';
+        spacer.style.border = 'none';
+        container.appendChild(spacer);
         return container;
       },
       ranking() {
@@ -376,6 +396,12 @@
           list.innerHTML = `<div class="empty">Nada por aqui ainda… Poste algo e ganhe curtidas!</div>`;
         }
         container.appendChild(list);
+        // Adiciona container branco ao final, sem borda e com altura reduzida
+        const spacer = document.createElement('div');
+        spacer.className = 'card pad';
+        spacer.style.height = '80px';
+        spacer.style.border = 'none';
+        container.appendChild(spacer);
         return container;
       },
       postar() {
@@ -439,22 +465,67 @@
         tips.className = 'muted';
         tips.innerHTML = 'Dica: clique no seu nome em qualquer mensagem para ver seu mural pessoal.';
         container.appendChild(tips);
+        // Adiciona container branco ao final, sem borda e com altura reduzida
+        const spacer = document.createElement('div');
+        spacer.className = 'card pad';
+        spacer.style.height = '80px';
+        spacer.style.border = 'none';
+        container.appendChild(spacer);
         return container;
       },
       perfis() {
         const container = document.createElement('div');
-        container.innerHTML = `<h3 style="margin-top:0">Perfis ativos (últimos 60 minutos)</h3>`;
+        container.innerHTML = `<h3 style="margin-top:0">Perfis ativos (últimas 24 horas)</h3>`;
         const grid = document.createElement('div');
         grid.className = 'profiles';
-        const tenMinutes = 60 * 60 * 1000; // 60 minutos em milissegundos
-        const activeUsers = DB.users.filter(u => (Date.now() - (u.lastActive || u.createdAt)) <= tenMinutes);
+        const threeDays = 1 * 24 * 60 * 60 * 1000;
+        const activeUsers = DB.users.filter(u => (Date.now() - (u.lastActive || u.createdAt)) <= threeDays);
         activeUsers.sort((a, b) => (b.lastActive || b.createdAt) - (a.lastActive || a.createdAt)).forEach(u => {
           grid.appendChild(renderProfileCard(u));
         });
         if (activeUsers.length === 0) {
-          grid.innerHTML = `<div class="empty">Nenhum perfil ativo nos últimos 60 minutos.</div>`;
+          grid.innerHTML = `<div class="empty">Nenhum perfil ativo nas ultimas 24 horas.</div>`;
         }
         container.appendChild(grid);
+        // Adiciona container branco ao final, sem borda e com altura reduzida
+        const spacer = document.createElement('div');
+        spacer.className = 'card pad';
+        spacer.style.height = '80px';
+        spacer.style.border = 'none';
+        container.appendChild(spacer);
+        return container;
+      },
+      sobre() {
+        const container = document.createElement('div');
+        container.innerHTML = `<div class="row" style="justify-content:space-between;gap:8px;margin-bottom:8px">
+            <h3 style="margin:0">Sobre o Fokachat</h3>
+          </div>`;
+        const list = document.createElement('div');
+        list.className = 'list';
+        list.innerHTML = `
+          <div class="ranking-text">
+            O <b>Fokachat</b> é um mural anônimo para compartilhar ideias, pensamentos e mensagens de forma divertida, gentil e criativa. Aqui, você pode se expressar livremente usando um perfil anônimo, interagir com outros usuários e construir uma comunidade vibrante. Confira como aproveitar ao máximo:
+          </div>
+          <div class="sep"></div>
+          <div class="ranking-text"><b>Feed</b>: Explore mensagens públicas postadas nos últimos 5 dias, organizadas por ordem cronológica (do mais recente ao mais antigo). É o lugar perfeito para se inspirar e acompanhar o que a comunidade está compartilhando!</div>
+          <div class="ranking-text"><b>Postar</b>: Escreva mensagens curtas (até 280 caracteres) e publique no feed público. Você pode postar até <b>3 mensagens por dia</b>. Seja criativo, gentil ou curioso, mas sempre respeite os outros!</div>
+          <div class="ranking-text"><b>Ranking</b>: Veja as <b>10 mensagens mais curtidas</b> de todos os tempos. Curta mensagens que você gosta clicando no ícone de coração (♡) e ajude suas favoritas a subirem no ranking!</div>
+          <div class="ranking-text"><b>Perfis</b>: Descubra perfis ativos (que interagiram nas últimas 24 horas). Clique no nome ou no botão "Ver mural" para explorar as mensagens de um usuário específico.</div>
+          <div class="ranking-text"><b>Sincronizar Perfil</b>: Quer usar o mesmo perfil anônimo em outro dispositivo? No cabeçalho, clique em <b>Exportar código</b> para gerar um código de transferência. Depois, em outro navegador ou dispositivo, use <b>Importar código</b> e cole o código para carregar seu perfil. <b>Cuidado</b>: guarde o código em segurança, pois ele dá acesso ao seu ID anônimo!</div>
+          <div class="ranking-text"><b>Novo Perfil</b>: Cansado do seu perfil atual? Clique em <b>Novo perfil</b> no cabeçalho para criar um novo ID anônimo. Observação: você só pode gerar um novo perfil uma vez por dia.</div>
+          <div class="ranking-text"><b>Selos</b>: Ganhe selos ao interagir no Fokachat! <b>🔅</b> por postar ou curtir mensagens, <b>🫟</b> por receber curtidas e <b>♾️</b> ao atingir o limite de 3 posts em um dia. Mostre sua participação!</div>
+          <div class="sep"></div>
+          <div class="ranking-text">
+            <b>Dica inicial</b>: Comece explorando o <b>Feed</b>, publique sua primeira mensagem em <b>Postar</b> e confira os perfis ativos em <b>Perfis</b>. Divirta-se e faça parte da comunidade Fokachat!
+          </div>
+        `;
+        container.appendChild(list);
+        // Adiciona container branco ao final, sem borda e com altura reduzida
+        const spacer = document.createElement('div');
+        spacer.className = 'card pad';
+        spacer.style.height = '80px';
+        spacer.style.border = 'none';
+        container.appendChild(spacer);
         return container;
       },
       usuario(userId) {
@@ -475,39 +546,25 @@
           list.innerHTML = `<div class="empty">Este perfil ainda não postou nada.</div>`;
         }
         container.appendChild(list);
+        // Adiciona container branco ao final, sem borda e com altura reduzida
+        const spacer = document.createElement('div');
+        spacer.className = 'card pad';
+        spacer.style.height = '80px';
+        spacer.style.border = 'none';
+        container.appendChild(spacer);
         return container;
       }
     };
 
     function renderHeader() {
       const me = DB.user;
-      const meLine = `Conectado como <b>${me.name}</b> ${DB.connected ? '✅' : ''}`;
+      const meLine = `Conectado como <b>${me.name}${getUserBadges(me.id)}</b> ${DB.connected ? '✅' : ''}`;
       $('#meLine').innerHTML = meLine;
       const headerAv = $('#headerAvatar');
       headerAv.innerHTML = '';
       const av = makeAvatar(me);
       av.classList.add('small');
       headerAv.appendChild(av);
-    }
-
-    function renderMyProfile() {
-      const me = DB.user;
-      const box = document.createElement('div');
-      box.className = 'profile';
-      const av = makeAvatar(me, '44px');
-      const col = document.createElement('div');
-      col.style.flex = '1';
-      col.innerHTML = `<div style="font-weight:800">${me.name}</div><div class="muted" style="font-size:12px">ID: ${me.id.slice(0, 6)}</div>`;
-      const btn = document.createElement('button');
-      btn.className = 'btn ghost';
-      btn.textContent = 'Ver meu mural';
-      btn.onclick = () => showUser(DB.user.id);
-      box.appendChild(av);
-      box.appendChild(col);
-      box.appendChild(btn);
-      const target = $('#myProfile');
-      target.innerHTML = '';
-      target.appendChild(box);
     }
 
     function makeAvatar(user, size = '44px') {
@@ -529,7 +586,7 @@
       col.style.flex = '1';
       const link = document.createElement('a');
       link.className = 'link';
-      link.textContent = u.name;
+      link.textContent = u.name + getUserBadges(u.id);
       link.href = '#';
       link.onclick = (e) => { e.preventDefault(); showUser(u.id); };
       const small = document.createElement('div');
@@ -557,7 +614,7 @@
       const nameLink = document.createElement('a');
       nameLink.className = 'link';
       nameLink.href = '#';
-      nameLink.textContent = user.name;
+      nameLink.textContent = user.name + getUserBadges(user.id);
       nameLink.onclick = (e) => { e.preventDefault(); showUser(user.id); };
       const meta = document.createElement('div');
       meta.className = 'meta';
@@ -638,6 +695,7 @@
       if (tab === 'ranking') mount(Views.ranking());
       if (tab === 'postar') mount(Views.postar());
       if (tab === 'perfis') mount(Views.perfis());
+      if (tab === 'sobre') mount(Views.sobre());
       location.hash = '#' + tab;
     }
 
@@ -659,6 +717,7 @@
       if (h === 'ranking') switchTab('ranking');
       else if (h === 'postar') switchTab('postar');
       else if (h === 'perfis') switchTab('perfis');
+      else if (h === 'sobre') switchTab('sobre');
       else switchTab('feed');
     }
 
@@ -677,14 +736,7 @@
       if (DB.connected) {
         try {
           const userDocRef = doc(dbFire, 'users', DB.user.id);
-          await setDoc(userDocRef, {
-            id: DB.user.id,
-            name: DB.user.name,
-            emoji: DB.user.emoji,
-            bg: DB.user.bg,
-            createdAt: Timestamp.fromMillis(DB.user.createdAt),
-            lastActive: Timestamp.fromMillis(DB.user.lastActive)
-          }, { merge: true });
+          await setDoc(userDocRef, { lastActive: Timestamp.fromMillis(DB.user.lastActive) }, { merge: true });
         } catch (e) {
           console.warn('Não foi possível atualizar lastActive na nuvem', e);
         }
@@ -894,7 +946,7 @@
           <button class="btn primary" id="copyCode">Copiar código</button>
           <button class="btn" id="closeModalBtn">Fechar</button>
         </div>
-        <div class="muted-note">Observação: quem tiver este código poderá usar este mesmo ID anônimo. Guarde com responsabilidade.</div>
+        <div class="muted-note">Observação: quem tiver este código poderá usar este mesmo ID anônimo. Guarde com responsabilidade.</div>        
       `);
       $('#copyCode').onclick = () => {
         navigator.clipboard.writeText(code).then(() => alert('Código copiado!'));
