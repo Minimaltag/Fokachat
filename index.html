@@ -8,6 +8,7 @@
   <link rel="icon" href="favicon.ico" type="image/x-icon" />
   <link rel="stylesheet" href="style.css" />                           
 </head>
+<link rel="manifest" href="manifest.json">
 <body>
   <header>
     <div class="wrap row">
@@ -1026,6 +1027,13 @@
     $('#genCodeBtn').addEventListener('click', handleGenerateCode);
     $('#importCodeBtn').addEventListener('click', handleImportCode);
     $('#reseedBtn').addEventListener('click', handleReseed);
-  </script>    
+  </script> 
+  <script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js")
+      .then(() => console.log("Service Worker registrado"))
+      .catch(err => console.error("SW erro:", err));
+  }
+</script>   
 </body>
 </html>
