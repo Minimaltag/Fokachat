@@ -18,9 +18,6 @@
         </div>
       </div>
       <div>
-        <h4 style="margin:0 0 8px">Sincronizar entre navegadores</h4>
-        <div class="muted" style="font-size:13px">
-          Gere um <b>código de transferência</b> e cole-o em outro navegador para usar o mesmo ID anônimo.
         </div>
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn primary" id="genCodeBtn" title="Exportar código">
@@ -530,16 +527,22 @@
       }
     };
 
-    function renderHeader() {
-      const me = DB.user;
-      const meLine = `Conectado como <b>${me.name}${getUserBadges(me.id)}</b> ${DB.connected ? '✅' : ''}`;
-      $('#meLine').innerHTML = meLine;
-      const headerAv = $('#headerAvatar');
-      headerAv.innerHTML = '';
-      const av = makeAvatar(me);
-      av.classList.add('small');
-      headerAv.appendChild(av);
-    }
+        function renderHeader() {
+        const me = DB.user;
+        const meLine = `
+          <div>
+          <span>Conectado como:</span><br>
+          <b>${me.name}${getUserBadges(me.id)}</b> ${DB.connected ? '✅' : ''}
+          </div>
+          `;
+          $('#meLine').innerHTML = meLine;
+
+          const headerAv = $('#headerAvatar');
+          headerAv.innerHTML = '';
+          const av = makeAvatar(me);
+          av.classList.add('small');
+          headerAv.appendChild(av);
+     }
 
     function makeAvatar(user, size = '44px') {
       const d = document.createElement('div');
