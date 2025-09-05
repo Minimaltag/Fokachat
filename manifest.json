@@ -3,8 +3,8 @@
   "short_name": "FokaChat",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#adadbd",
-  "theme_color": "#adadbd",
+  "background_color": "#6D6D6E",
+  "theme_color": "#6D6D6E",
   "orientation": "portrait",
   "icons": [
     {
